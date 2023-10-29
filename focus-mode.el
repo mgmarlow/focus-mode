@@ -1,4 +1,4 @@
-;;; focus.el --- A minor mode for focused writing  -*- lexical-binding: t; -*-
+;;; focus-mode.el --- A minor mode for focused writing  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2023
 
@@ -88,5 +88,5 @@
                 (font-lock-mode 1)
                 (remove-hook 'post-command-hook #'focus-sentence-hook)))))
 
-(provide 'focus)
-;;; focus.el ends here
+(provide 'focus-mode)
+;;; focus-mode.el ends here
