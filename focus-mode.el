@@ -62,8 +62,8 @@ Value is a face name or plist of face attributes."
         (setq par-text-beg (point))
         (end-of-paragraph-text)
         (setq par-text-end (point)))
-      ;; TODO: This might be locking up the minor mode occasionally.
       ;; Avoid "wrong side of point" errors during re-search.
+      (princ (cons par-text-beg par-text-end))
       (when (and (>= pos par-text-beg)
                  (<= pos par-text-end))
         (if (re-search-backward sentence-end par-text-beg t)
@@ -80,13 +80,17 @@ Value is a face name or plist of face attributes."
 
 ;; TODO: Something here is interferring with selecting text.
 (defun focus-sentence ()
-  (interactive)
-  (when-let ((region (focus-sentence-region)))
-    (unless (equal focus-prev-region region)
-      (when focus-prev-region
-        (set-text-properties (car focus-prev-region) (cdr focus-prev-region) nil))
-      (add-face-text-property (car region) (cdr region) focus-face-main)
-      (setq focus-prev-region region))))
+  (condition-case nil
+      (when-let ((region (focus-sentence-region)))
+        (unless (or (equal focus-prev-region region)
+                    (< (car region) 0)
+                    (> (cdr region) (point-max)))
+          (when focus-prev-region
+            (set-text-properties (car focus-prev-region) (cdr focus-prev-region) nil))
+          (add-face-text-property (car region) (cdr region) focus-face-main)
+          (setq focus-prev-region region)))
+    ;; Ignore navigation errors in the hope we recover.
+    (args-out-of-range nil)))
 
 (defvar-local focus-last-command-pos 0)
 
@@ -94,6 +98,7 @@ Value is a face name or plist of face attributes."
 (defun focus-sentence-hook ()
   (unless (or (window-minibuffer-p)
               (equal (point) focus-last-command-pos))
+    (message (format "trying to focus at %d" (point)))
     (focus-sentence))
   (setq focus-last-command-pos (point)))
 
