@@ -27,14 +27,17 @@
 
 ;;; Code:
 
-;; TODO:
-;; This is kinda important for this package, need to document some
-;; way. Definitely need to set this in userland.
-(customize-set-variable 'sentence-end-double-space nil)
-
 (defgroup focus nil
   "Minor mode for focused writing."
   :group 'wp)
+
+(defcustom focus-type 'sentence
+  "Set focusing behavior to active sentence or active paragraph.
+
+Defaults to sentence."
+  :type '(choice (const sentence)
+                 (const paragraph))
+  :group 'focus)
 
 (defcustom focus-face-main '(:foreground "#cfbcba")
   "Primary, focused font face.
@@ -43,14 +46,26 @@ Value is a face name or plist of face attributes."
   :type 'face
   :group 'focus)
 
-(defcustom focus-face-dim '(:foreground "#cfbcba")
+(defcustom focus-face-dim '(:foreground "#887c8a")
   "Dimmed, background font face.
 
 Value is a face name or plist of face attributes."
   :type 'face
   :group 'focus)
 
-(defun focus-sentence-region ()
+(defun focus--paragraph-region ()
+  "Return a dotted pair containing the current paragraph's min and max."
+  (let (par-text-beg par-text-end)
+    (save-excursion
+      (start-of-paragraph-text)
+      (setq par-text-beg (point))
+      (end-of-paragraph-text)
+      (setq par-text-end (point)))
+    (cons par-text-beg par-text-end)))
+
+;; TODO: Occasional off-by-one errors where the previous sentence's punctuation is highlighted
+(defun focus--sentence-region ()
+  "Return a dotted pair containing the current sentence's min and max."
   (save-excursion
     ;; Adapted from `forward-sentence'.
     (let ((pos (point))
@@ -63,7 +78,6 @@ Value is a face name or plist of face attributes."
         (end-of-paragraph-text)
         (setq par-text-end (point)))
       ;; Avoid "wrong side of point" errors during re-search.
-      (princ (cons par-text-beg par-text-end))
       (when (and (>= pos par-text-beg)
                  (<= pos par-text-end))
         (if (re-search-backward sentence-end par-text-beg t)
@@ -76,47 +90,55 @@ Value is a face name or plist of face attributes."
           (setq focus-end par-text-end))
         (cons focus-beg focus-end)))))
 
-(defvar-local focus-prev-region nil)
+(defvar-local focus--prev-region nil
+  "Previous focused region.
+
+Avoid focusing a region if it is has already been focused.")
 
 ;; TODO: Something here is interferring with selecting text.
-(defun focus-sentence ()
+(defun focus--region (region-fn)
   (condition-case nil
-      (when-let ((region (focus-sentence-region)))
-        (unless (or (equal focus-prev-region region)
+      (when-let ((region (funcall region-fn)))
+        (unless (or (equal focus--prev-region region)
                     (< (car region) 0)
                     (> (cdr region) (point-max)))
-          (when focus-prev-region
-            (set-text-properties (car focus-prev-region) (cdr focus-prev-region) nil))
+          (when focus--prev-region
+            (set-text-properties (car focus--prev-region) (cdr focus--prev-region) nil))
           (add-face-text-property (car region) (cdr region) focus-face-main)
-          (setq focus-prev-region region)))
+          (setq focus--prev-region region)))
     ;; Ignore navigation errors in the hope we recover.
-    (args-out-of-range nil)))
+    (args-out-range nil)))
 
-(defvar-local focus-last-command-pos 0)
+(defvar-local focus--last-command-pos 0
+  "Previous point position.
 
-;; TODO: sentence vs. paragraph mode
-(defun focus-sentence-hook ()
+Ensures that `focus-post-command-hook' is only run after commands
+that deal with moving the cursor.")
+
+(defun focus-post-command-hook ()
   (unless (or (window-minibuffer-p)
-              (equal (point) focus-last-command-pos))
-    (message (format "trying to focus at %d" (point)))
-    (focus-sentence))
-  (setq focus-last-command-pos (point)))
+              (equal (point) focus--last-command-pos))
+    (if (eq focus-type 'sentence)
+        (focus--region #'focus--sentence-region)
+      (focus--region #'focus--paragraph-region)))
+  (setq focus--last-command-pos (point)))
 
+;;;###autoload
 (define-minor-mode focus-mode
   "Toggle focused writing mode."
-  :lighter "focus-mode")
-
-(add-hook 'focus-mode-hook
-          (lambda ()
-            (if focus-mode
-                (progn
-                  (font-lock-mode -1)
-                  (buffer-face-set focus-face-dim)
-                  (add-hook 'post-command-hook #'focus-sentence-hook nil t))
-              (progn
-                (buffer-face-mode -1)
-                (font-lock-mode 1)
-                (remove-hook 'post-command-hook #'focus-sentence-hook)))))
+  :lighter "focus-mode"
+  (cond
+   ;; Initialization
+   (focus-mode
+    (setq focus--prev-region nil)
+    (font-lock-mode -1)
+    (buffer-face-set focus-face-dim)
+    (add-hook 'post-command-hook #'focus-post-command-hook nil t))
+   ;; Cleanup
+   (t
+    (buffer-face-mode -1)
+    (font-lock-mode 1)
+    (remove-hook 'post-command-hook #'focus-post-command-hook t))))
 
 (provide 'focus-mode)
 ;;; focus-mode.el ends here
