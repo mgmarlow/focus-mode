@@ -1,5 +1,3 @@
-- sentence-end-double-space 
-- forward-sentence
-- backward-sentence
-- font-lock-update
-- (add-text-properties (region-beginning) (region-end) '(face font-lock-warning-face))
+# Focus mode
+
+wip
