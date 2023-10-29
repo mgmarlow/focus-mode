@@ -4,8 +4,9 @@
 
 ;; Author: Graham Marlow <info@mgmarlow.com>
 ;; Keywords: wp
+;; Homepage: https://git.sr.ht/~mgmarlow/focus-mode
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "24.3"))
+;; Package-Requires: ((emacs "25.1"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -22,13 +23,32 @@
 
 ;;; Commentary:
 
-;; 
+;; A minor mode for focused writing.
 
 ;;; Code:
 
+;; TODO:
 ;; This is kinda important for this package, need to document some
 ;; way. Definitely need to set this in userland.
 (customize-set-variable 'sentence-end-double-space nil)
+
+(defgroup focus nil
+  "Minor mode for focused writing."
+  :group 'wp)
+
+(defcustom focus-face-main '(:foreground "#cfbcba")
+  "Primary, focused font face.
+
+Value is a face name or plist of face attributes."
+  :type 'face
+  :group 'focus)
+
+(defcustom focus-face-dim '(:foreground "#cfbcba")
+  "Dimmed, background font face.
+
+Value is a face name or plist of face attributes."
+  :type 'face
+  :group 'focus)
 
 (defun focus-sentence-region ()
   (save-excursion
@@ -42,37 +62,43 @@
         (setq par-text-beg (point))
         (end-of-paragraph-text)
         (setq par-text-end (point)))
-      (if (re-search-backward sentence-end par-text-beg t)
-          (setq focus-beg (match-end 0))
-        (setq focus-beg par-text-beg))
-      ;; Reset position before searching again
-      (goto-char pos)
-      (if (re-search-forward sentence-end par-text-end t)
-          (setq focus-end (match-beginning 0))
-        (setq focus-end par-text-end))
-      (cons focus-beg focus-end))))
+      ;; TODO: This might be locking up the minor mode occasionally.
+      ;; Avoid "wrong side of point" errors during re-search.
+      (when (and (>= pos par-text-beg)
+                 (<= pos par-text-end))
+        (if (re-search-backward sentence-end par-text-beg t)
+            (setq focus-beg (match-end 0))
+          (setq focus-beg par-text-beg))
+        ;; Reset position before searching again
+        (goto-char pos)
+        (if (re-search-forward sentence-end par-text-end t)
+            (setq focus-end (match-end 0))
+          (setq focus-end par-text-end))
+        (cons focus-beg focus-end)))))
 
 (defvar-local focus-prev-region nil)
 
-;; TODO: Error in post-command-hook (focus-sentence-hook): (error "Invalid search bound (wrong side of point)")
+;; TODO: Something here is interferring with selecting text.
 (defun focus-sentence ()
   (interactive)
-  (let ((region (focus-sentence-region)))
+  (when-let ((region (focus-sentence-region)))
     (unless (equal focus-prev-region region)
       (when focus-prev-region
         (set-text-properties (car focus-prev-region) (cdr focus-prev-region) nil))
-      (add-face-text-property (car region) (cdr region) '(:foreground "red"))
+      (add-face-text-property (car region) (cdr region) focus-face-main)
       (setq focus-prev-region region))))
 
 (defvar-local focus-last-command-pos 0)
 
+;; TODO: sentence vs. paragraph mode
 (defun focus-sentence-hook ()
-  (unless (or (window-minibuffer-p) (equal (point) focus-last-command-pos))
+  (unless (or (window-minibuffer-p)
+              (equal (point) focus-last-command-pos))
     (focus-sentence))
   (setq focus-last-command-pos (point)))
 
 (define-minor-mode focus-mode
-  "Toggle focus mode."
+  "Toggle focused writing mode."
   :lighter "focus-mode")
 
 (add-hook 'focus-mode-hook
@@ -80,10 +106,9 @@
             (if focus-mode
                 (progn
                   (font-lock-mode -1)
-                  ;; TODO: custom face
-                  (buffer-face-set 'consult-separator)
+                  (buffer-face-set focus-face-dim)
                   (add-hook 'post-command-hook #'focus-sentence-hook nil t))
-              (progn 
+              (progn
                 (buffer-face-mode -1)
                 (font-lock-mode 1)
                 (remove-hook 'post-command-hook #'focus-sentence-hook)))))
