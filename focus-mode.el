@@ -95,6 +95,10 @@ Value is a face name or plist of face attributes."
 
 Avoid focusing a region if it is has already been focused.")
 
+(defun focus--clear-prev-region ()
+  (when focus--prev-region
+    (set-text-properties (car focus--prev-region) (cdr focus--prev-region) nil)))
+
 ;; TODO: Something here is interferring with selecting text.
 (defun focus--region (region-fn)
   (condition-case nil
@@ -102,8 +106,7 @@ Avoid focusing a region if it is has already been focused.")
         (unless (or (equal focus--prev-region region)
                     (< (car region) 0)
                     (> (cdr region) (point-max)))
-          (when focus--prev-region
-            (set-text-properties (car focus--prev-region) (cdr focus--prev-region) nil))
+          (focus--clear-prev-region)
           (add-face-text-property (car region) (cdr region) focus-face-main)
           (setq focus--prev-region region)))
     ;; Ignore navigation errors in the hope we recover.
@@ -136,6 +139,7 @@ that deal with moving the cursor.")
     (add-hook 'post-command-hook #'focus-post-command-hook nil t))
    ;; Cleanup
    (t
+    (focus--clear-prev-region)
     (buffer-face-mode -1)
     (font-lock-mode 1)
     (remove-hook 'post-command-hook #'focus-post-command-hook t))))
