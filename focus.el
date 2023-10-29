@@ -4,6 +4,8 @@
 
 ;; Author: Graham Marlow <info@mgmarlow.com>
 ;; Keywords: wp
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "24.3"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -26,7 +28,7 @@
 
 ;; This is kinda important for this package, need to document some
 ;; way. Definitely need to set this in userland.
-(setq sentence-end-double-space nil)
+(customize-set-variable 'sentence-end-double-space nil)
 
 (defun focus-sentence-region ()
   (save-excursion
@@ -50,24 +52,36 @@
         (setq focus-end par-text-end))
       (cons focus-beg focus-end))))
 
+;; TODO: Error in post-command-hook (focus-sentence-hook): (error "Invalid search bound (wrong side of point)")
 (defun focus-sentence ()
   (interactive)
   (let ((region (focus-sentence-region)))
-    (font-lock-mode -1)
-    ;; TODO: custom face here, light and dark mode support, with variable override
-    (buffer-face-set 'consult-separator)
-    (add-face-text-property (car region) (cdr region) '(:foreground "red"))))
+    (when (< (car region) (cdr region))
+      (add-face-text-property (car region) (cdr region) '(:foreground "red")))))
 
 (defvar-local focus-last-command-pos 0)
 
 (defun focus-sentence-hook ()
   (unless (or (window-minibuffer-p) (equal (point) focus-last-command-pos))
-    (message "running hook")
     (focus-sentence))
   (setq focus-last-command-pos (point)))
 
-;; TODO: wrap this in a minor mode
-(add-hook 'post-command-hook #'focus-sentence-hook nil :local)
+(define-minor-mode focus-mode
+  "Toggle focus mode."
+  :lighter "focus-mode")
+
+(add-hook 'focus-mode-hook
+          (lambda ()
+            (if focus-mode
+                (progn
+                  (font-lock-mode -1)
+                  ;; TODO: custom face
+                  (buffer-face-set 'consult-separator)
+                  (add-hook 'post-command-hook #'focus-sentence-hook nil t))
+              (progn 
+                (buffer-face-mode -1)
+                (font-lock-mode 1)
+                (remove-hook 'post-command-hook #'focus-sentence-hook)))))
 
 (provide 'focus)
 ;;; focus.el ends here
