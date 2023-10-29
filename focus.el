@@ -52,12 +52,17 @@
         (setq focus-end par-text-end))
       (cons focus-beg focus-end))))
 
+(defvar-local focus-prev-region nil)
+
 ;; TODO: Error in post-command-hook (focus-sentence-hook): (error "Invalid search bound (wrong side of point)")
 (defun focus-sentence ()
   (interactive)
   (let ((region (focus-sentence-region)))
-    (when (< (car region) (cdr region))
-      (add-face-text-property (car region) (cdr region) '(:foreground "red")))))
+    (unless (equal focus-prev-region region)
+      (when focus-prev-region
+        (set-text-properties (car focus-prev-region) (cdr focus-prev-region) nil))
+      (add-face-text-property (car region) (cdr region) '(:foreground "red"))
+      (setq focus-prev-region region))))
 
 (defvar-local focus-last-command-pos 0)
 
