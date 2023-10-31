@@ -53,42 +53,6 @@ Value is a face name or plist of face attributes."
   :type 'face
   :group 'focus)
 
-(defun focus--paragraph-region ()
-  "Return a dotted pair containing the current paragraph's min and max."
-  (let (par-text-beg par-text-end)
-    (save-excursion
-      (start-of-paragraph-text)
-      (setq par-text-beg (point))
-      (end-of-paragraph-text)
-      (setq par-text-end (point)))
-    (cons par-text-beg par-text-end)))
-
-;; TODO: Occasional off-by-one errors where the previous sentence's punctuation is highlighted
-(defun focus--sentence-region ()
-  "Return a dotted pair containing the current sentence's min and max."
-  (save-excursion
-    ;; Adapted from `forward-sentence'.
-    (let ((pos (point))
-          (sentence-end (sentence-end))
-          par-text-beg par-text-end
-          focus-beg focus-end)
-      (save-excursion
-        (start-of-paragraph-text)
-        (setq par-text-beg (point))
-        (end-of-paragraph-text)
-        (setq par-text-end (point)))
-      ;; Avoid "wrong side of point" errors during re-search.
-      (when (and (>= pos par-text-beg)
-                 (<= pos par-text-end))
-        (if (re-search-backward sentence-end par-text-beg t)
-            (setq focus-beg (match-end 0))
-          (setq focus-beg par-text-beg))
-        ;; Reset position before searching again
-        (goto-char pos)
-        (if (re-search-forward sentence-end par-text-end t)
-            (setq focus-end (match-end 0))
-          (setq focus-end par-text-end))
-        (cons focus-beg focus-end)))))
 
 (defvar-local focus--prev-region nil
   "Previous focused region.
@@ -122,8 +86,8 @@ that deal with moving the cursor.")
   (unless (or (window-minibuffer-p)
               (equal (point) focus--last-command-pos))
     (if (eq focus-type 'sentence)
-        (focus--region #'focus--sentence-region)
-      (focus--region #'focus--paragraph-region)))
+        (focus--region (lambda () (bounds-of-thing-at-point 'sentence)))
+      (focus--region (lambda () (bounds-of-thing-at-point 'paragraph)))))
   (setq focus--last-command-pos (point)))
 
 ;;;###autoload
