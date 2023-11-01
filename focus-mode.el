@@ -46,13 +46,12 @@ Value is a face name or plist of face attributes."
   :type 'face
   :group 'focus)
 
-(defcustom focus-face-dim '(:foreground "#887c8a")
+(defcustom focus-face-dim '(:foreground "#4A434C")
   "Dimmed, background font face.
 
 Value is a face name or plist of face attributes."
   :type 'face
   :group 'focus)
-
 
 (defvar-local focus--prev-region nil
   "Previous focused region.
