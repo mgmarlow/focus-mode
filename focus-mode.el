@@ -53,6 +53,15 @@ Value is a face name or plist of face attributes."
   :type 'face
   :group 'focus)
 
+(defcustom focus-centered-column-width nil
+  "Width of centered text in columns.
+
+Set this variable if you'd like to overide the default behavior
+of using `current-fill-column' to determine the width of the
+centered text when `focus-mode' is active."
+  :type 'integer
+  :group 'focus)
+
 (defvar-local focus--prev-region nil
   "Previous focused region.
 
@@ -89,6 +98,35 @@ that deal with moving the cursor.")
       (focus--region (lambda () (bounds-of-thing-at-point 'paragraph)))))
   (setq focus--last-command-pos (point)))
 
+(defun focus--centered-window-fringes (&optional window)
+  (let* ((window-width (window-pixel-width window))
+         (pixel (frame-char-width (window-frame window)))
+         (text-width (* pixel (or focus-centered-column-width
+                                  (current-fill-column)))))
+    (cons
+     (- (/ window-width 2) (/ text-width 2))
+     (- (/ window-width 2) (/ text-width 2)))))
+
+(defun focus-toggle-center-text (&optional activate)
+  "Toggle text centering.
+
+If ACTIVATE is nil, toggle text centering based on the current
+fringe value.  An ACTIVATE value of 1 will turn text centering
+on, and an ACTIVATE value of -1 will turn it off.
+
+The width of the centered text column is based on
+`focus-centered-column-width', but will default to
+`current-fill-column' to play nicely with `auto-fill-mode'."
+  (interactive)
+  (let* ((window (selected-window))
+         (fringes (window-fringes window))
+         (centered-fringes (focus--centered-window-fringes window)))
+    (if (or (eq activate 1) (= (car fringes) 0))
+        (set-window-fringes window
+                            (car centered-fringes)
+                            (cdr centered-fringes))
+      (set-window-fringes window 0))))
+
 ;;;###autoload
 (define-minor-mode focus-mode
   "Toggle focused writing mode."
@@ -99,13 +137,15 @@ that deal with moving the cursor.")
     (setq focus--prev-region nil)
     (font-lock-mode -1)
     (buffer-face-set focus-face-dim)
-    (add-hook 'post-command-hook #'focus-post-command-hook nil t))
+    (add-hook 'post-command-hook #'focus-post-command-hook nil t)
+    (focus-toggle-center-text 1))
    ;; Cleanup
    (t
     (focus--clear-prev-region)
     (buffer-face-mode -1)
     (font-lock-mode 1)
-    (remove-hook 'post-command-hook #'focus-post-command-hook t))))
+    (remove-hook 'post-command-hook #'focus-post-command-hook t)
+    (focus-toggle-center-text -1))))
 
 (provide 'focus-mode)
 ;;; focus-mode.el ends here
