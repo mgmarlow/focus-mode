@@ -57,3 +57,9 @@ your theme.
 - `focus-face-main`: Font face for primary, focused text.
 
 - `focus-face-dim`: Font face for background, dimmed text.
+
+### Text centering
+
+- `focus-centered-column-width`: Max width of centered text during
+  `focus-mode`. Defaults to `current-fill-column` to play nicely with
+  `auto-fill-mode`.
