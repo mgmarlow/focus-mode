@@ -6,7 +6,7 @@
 ;; Keywords: wp
 ;; Homepage: https://git.sr.ht/~mgmarlow/focus-mode
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "25.1"))
+;; Package-Requires: ((emacs "26.1"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -107,6 +107,19 @@ that deal with moving the cursor.")
      (- (/ window-width 2) (/ text-width 2))
      (- (/ window-width 2) (/ text-width 2)))))
 
+(defun focus--center-text (&optional window)
+  (let ((centered-fringes (focus--centered-window-fringes window)))
+    (set-window-fringes window
+                        (car centered-fringes)
+                        (cdr centered-fringes))))
+
+(defun focus-frame-changed-hook (frame)
+  "Called via `window-size-change-functions', recenters text.
+
+Only recenters if FRAME had a size-changed event."
+  (when (frame-size-changed-p frame)
+    (focus--center-text)))
+
 (defun focus-toggle-center-text (&optional activate)
   "Toggle text centering.
 
@@ -119,12 +132,9 @@ The width of the centered text column is based on
 `current-fill-column' to play nicely with `auto-fill-mode'."
   (interactive)
   (let* ((window (selected-window))
-         (fringes (window-fringes window))
-         (centered-fringes (focus--centered-window-fringes window)))
+         (fringes (window-fringes window)))
     (if (or (eq activate 1) (= (car fringes) 0))
-        (set-window-fringes window
-                            (car centered-fringes)
-                            (cdr centered-fringes))
+        (focus--center-text)
       (set-window-fringes window 0))))
 
 ;;;###autoload
@@ -138,14 +148,16 @@ The width of the centered text column is based on
     (font-lock-mode -1)
     (buffer-face-set focus-face-dim)
     (add-hook 'post-command-hook #'focus-post-command-hook nil t)
-    (focus-toggle-center-text 1))
+    (focus-toggle-center-text 1)
+    (add-hook 'window-size-change-functions #'focus-frame-changed-hook))
    ;; Cleanup
    (t
     (focus--clear-prev-region)
     (buffer-face-mode -1)
     (font-lock-mode 1)
     (remove-hook 'post-command-hook #'focus-post-command-hook t)
-    (focus-toggle-center-text -1))))
+    (focus-toggle-center-text -1)
+    (remove-hook 'window-size-change-functions #'focus-frame-changed-hook))))
 
 (provide 'focus-mode)
 ;;; focus-mode.el ends here
